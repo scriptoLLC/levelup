@@ -3,18 +3,20 @@
  * MIT License <https://github.com/level/levelup/blob/master/LICENSE.md>
  */
 
-var referee = require('referee')
-  , assert  = referee.assert
-  , refute  = referee.refute
-  , crypto  = require('crypto')
-  , async   = require('async')
-  , rimraf  = require('rimraf')
-  , fs      = require('fs')
-  , path    = require('path')
-  , delayed = require('delayed').delayed
-  , levelup = require('../lib/levelup.js')
-  , errors  = require('level-errors')
-  , dbidx   = 0
+var referee   = require('referee')
+  , assert    = referee.assert
+  , refute    = referee.refute
+  , crypto    = require('crypto')
+  , async     = require('async')
+  , rimraf    = require('rimraf')
+  , fs        = require('fs')
+  , path      = require('path')
+  , delayed   = require('delayed').delayed
+  , levelup   = require('../lib/levelup.js')
+  , errors    = require('level-errors')
+  , dbidx     = 0
+  , leveldown = require('leveldown')
+  , extend    = require('xtend')
 
 assert(levelup.errors === errors);
 
@@ -44,6 +46,15 @@ module.exports.nextLocation = function () {
   return path.join(__dirname, '_levelup_test_db_' + dbidx++)
 }
 
+module.exports.openTestBackend = function (callback) {
+  var location = module.exports.nextLocation()
+    , backend  = leveldown(location)
+
+  backend.open(function (err) {
+    callback(err, backend)
+  })
+}
+
 module.exports.cleanup = function (callback) {
   fs.readdir(__dirname, function (err, list) {
     if (err) return callback(err)
@@ -70,16 +81,18 @@ module.exports.openTestDatabase = function () {
   var options = typeof arguments[0] == 'object' ? arguments[0] : { createIfMissing: true, errorIfExists: true }
     , callback = typeof arguments[0] == 'function' ? arguments[0] : arguments[1]
     , location = typeof arguments[0] == 'string' ? arguments[0] : module.exports.nextLocation()
+    , backend
+    , db
 
   rimraf(location, function (err) {
     refute(err)
     this.cleanupDirs.push(location)
-    levelup(location, options, function (err, db) {
+    backend = leveldown(location)
+    backend.open(function (err) {
       refute(err)
-      if (!err) {
-        this.closeableDatabases.push(db)
-        callback(db)
-      }
+      db = levelup(extend(options, { db : backend }))
+      this.closeableDatabases.push(db)
+      callback(db)
     }.bind(this))
   }.bind(this))
 }
@@ -88,7 +101,11 @@ module.exports.commonTearDown = function (done) {
   async.forEach(
       this.closeableDatabases
     , function (db, callback) {
-        db.close(callback)
+        try {
+          db.close(callback)
+        } catch (err) {
+          callback()
+        }
       }
     , module.exports.cleanup.bind(null, done)
   )

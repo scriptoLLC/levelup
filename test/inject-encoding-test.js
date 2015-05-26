@@ -16,21 +16,21 @@ buster.testCase('JSON API', {
     'setUp': function (done) {
       common.commonSetUp.call(this, function () {
         this.runTest = function (testData, assertType, done) {
-          var location = common.nextLocation()
-          this.cleanupDirs.push(location)
-          console.log(location)
-          levelup(location, {
-            createIfMissing: true,
-            errorIfExists: true,
-            valueEncoding: {
-              encode: msgpack.encode,
-              decode: msgpack.decode,
-              buffer: true,
-              type: 'msgpack'
-            }
-          }, function (err, db) {
+          common.openTestBackend(function (err, backend) {
             refute(err)
-            if (err) return
+
+            var db = levelup({
+              db: backend,
+              createIfMissing: true,
+              errorIfExists: true,
+              valueEncoding: {
+                encode: msgpack.encode,
+                decode: msgpack.decode,
+                buffer: true,
+                type: 'msgpack'
+              }
+            })
+            refute(err)
 
             this.closeableDatabases.push(db)
 
@@ -53,7 +53,6 @@ buster.testCase('JSON API', {
                   )
                 }
             )
-
           }.bind(this))
         }
         done()

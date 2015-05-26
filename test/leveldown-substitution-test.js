@@ -15,7 +15,7 @@ buster.testCase('LevelDOWN Substitution', {
     'test substitution of LevelDOWN with MemDOWN': function (done) {
       var md       = new MemDOWN('foo')
         , db       =
-            levelup('/somewhere/not/writable/booya!', { db: function () { return md } })
+            levelup({ db: md })
         , entries  = []
         , expected = [
               { key: 'a', value: 'A' }

@@ -22,12 +22,16 @@ buster.testCase('Encoding', {
               refute(err)
               db.close(function (err) {
                 refute(err)
-                db = levelup(db.location, { createIfMissing: false, errorIfExists: false, valueEncoding: 'json' })
-                db.get('foo', function (err, value) {
-                  assert(err)
-                  assert.equals('EncodingError', err.name)
-                  refute(value)
-                  db.close(done)
+                var backend = db.db
+                backend.open(function (err) {
+                  refute(err)
+                  db = levelup({ db: backend, createIfMissing: false, errorIfExists: false, valueEncoding: 'json' })
+                  db.get('foo', function (err, value) {
+                    assert(err)
+                    assert.equals('EncodingError', err.name)
+                    refute(value)
+                    db.close(done)
+                  })
                 })
               })
             })
@@ -46,16 +50,21 @@ buster.testCase('Encoding', {
 
                 var dataSpy  = this.spy()
                   , errorSpy = this.spy()
+                  , backend  = db.db
+                
+                backend.open(function (err) {
+                  refute(err)
 
-                db = levelup(db.location, { createIfMissing: false, errorIfExists: false, valueEncoding: 'json' })
-                db.readStream()
-                  .on('data', dataSpy)
-                  .on('error', errorSpy)
-                  .on('close', function () {
-                    assert.equals(dataSpy.callCount, 0, 'no data')
-                    assert.equals(errorSpy.callCount, 1, 'error emitted')
-                    assert.equals('EncodingError', errorSpy.getCall(0).args[0].name)
-                    db.close(done)
+                  db = levelup({ db: backend, createIfMissing: false, errorIfExists: false, valueEncoding: 'json' })
+                  db.readStream()
+                    .on('data', dataSpy)
+                    .on('error', errorSpy)
+                    .on('close', function () {
+                      assert.equals(dataSpy.callCount, 0, 'no data')
+                      assert.equals(errorSpy.callCount, 1, 'error emitted')
+                      assert.equals('EncodingError', errorSpy.getCall(0).args[0].name)
+                      db.close(done)
+                    })
                   })
               }.bind(this))
             }.bind(this))

@@ -17,10 +17,10 @@ buster.testCase('null & undefined keys & values', {
 
   , 'null and undefined': {
         'setUp': function (done) {
-          levelup(this.cleanupDirs[0] = common.nextLocation(), { createIfMissing: true }, function (err, db) {
-            refute(err) // sanity
+          common.openTestBackend(function (err, backend) {
+            refute(err)
+            var db = levelup({ db: backend })
             this.closeableDatabases.push(db)
-            assert.isTrue(db.isOpen())
             this.db = db
             done()
           }.bind(this))

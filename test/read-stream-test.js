@@ -4,6 +4,7 @@
  */
 
 var levelup    = require('../lib/levelup.js')
+  , leveldown  = require('leveldown')
   , common     = require('./common')
   , SlowStream = require('slow-stream')
   , delayed    = require('delayed')
@@ -113,9 +114,12 @@ buster.testCase('ReadStream', {
       db.batch(this.sourceData.slice(), function (err) {
         refute(err)
         db.close(function (err) {
-          var rs = db.createReadStream()
-          rs.destroy()
-          done()
+          try {
+           db.createReadStream()
+          } catch (e) {
+            return done()
+          }
+          throw new Error('did not throw')
         }.bind(this))
       }.bind(this))
     }.bind(this))
@@ -530,7 +534,11 @@ buster.testCase('ReadStream', {
               .on('close', delayed.delayed(callback, 0.05))
           }
         , open       = function (reopen, location, callback) {
-            levelup(location, { createIfMissing: !reopen, errorIfExists: !reopen }, callback)
+            var backend = leveldown(location, { createIfMissing: !reopen, errorIfExists: !reopen })
+            backend.open(function (err) {
+              if (err) return callback(err)
+              callback(null, levelup({ db: backend }))
+            })
           }
         , write      = function (db, callback) { db.batch(sourceData.slice(), callback) }
         , close      = function (db, callback) { db.close(callback) }
@@ -557,35 +565,6 @@ buster.testCase('ReadStream', {
           }
 
       setup(delayed.delayed(reopen, 0.05))
-    }
-
-
-    // this is just a fancy way of testing levelup('/path').createReadStream()
-    // i.e. not waiting for 'open' to complete
-    // the logic for this is inside the ReadStream constructor which waits for 'ready'
-  , 'test ReadStream on pre-opened db': function (done) {
-      var execute = function (db) {
-            // is in limbo
-            refute(db.isOpen())
-            refute(db.isClosed())
-
-            var rs = db.createReadStream()
-            rs.on('data' , this.dataSpy)
-            rs.on('end'  , this.endSpy)
-            rs.on('close', this.verify.bind(this, rs, done))
-          }.bind(this)
-        , setup = function (db) {
-            db.batch(this.sourceData.slice(), function (err) {
-              refute(err)
-              db.close(function (err) {
-                refute(err)
-                var db2 = levelup(db.location, { createIfMissing: false, errorIfExists: false, valueEncoding: 'utf8' })
-                execute(db2)
-              })
-            }.bind(this))
-          }.bind(this)
-
-      this.openTestDatabase(setup)
     }
 
   , 'test readStream() with "limit"': function (done) {
